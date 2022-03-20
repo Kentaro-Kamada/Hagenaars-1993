@@ -90,3 +90,96 @@ bind_rows(
   gt()
   
 
+# tab3.3 --------------------------------------------------------------------------------------
+
+# lemのスクリプト作成
+lat <- 'lat 2'
+man <- 'man 5'
+dim <- 'dim 2 2 2 2 2 2 2'
+lab <- 'lab Y Z A B C D E'
+mod <- 'mod YZ A|Y B|Y C|Z D|Z E|Y'
+ite <- 'ite 10000'
+dat <- str_c('dat [', str_c(data$n, collapse = ' '), ']')
+see <- str_c('see ', rdunif(20, 999, 100))
+
+
+# ファイルの削除
+file.remove(list.files('lem/tab3.3', full.names = T, recursive = T))
+
+# スクリプト書き出し
+walk(see, ~{write_lines(c(lat, man, dim, lab, mod, ite, dat, .), 
+                        file = str_c('lem/tab3.3/inp/', str_remove(., ' '), '.inp'))})
+
+
+# inputファイルとoutputファイルのパス指定
+inp_path <- list.files('lem/tab3.3/inp', full.names = T)
+out_path <- str_replace_all(inp_path, 'inp', 'out')
+
+# lem実行
+walk(str_c('lem95', inp_path, out_path, sep = ' '),
+     ~{system(., wait = F)
+       Sys.sleep(0.4)})
+
+
+# 最大対数尤度の読み出し
+max_loglik <-
+  tibble(
+    filepath = out_path,
+    loglik = map_chr(filepath, read_file)
+  ) %>% 
+  mutate(
+    seed = str_extract(loglik, '(?<=Seed random values   = ).+') %>% 
+      parse_double(),
+    loglik = str_extract(loglik, '(?<=Log-likelihood       = ).+') %>% 
+      parse_double()
+  ) %>% 
+  arrange(desc(loglik)) %>% 
+  mutate(rank = dense_rank(desc(loglik)))
+
+# 適合度の読み出し
+
+tibble(
+  filepath = max_loglik$filepath[1],
+  output = map_chr(filepath, read_file)
+) %>% 
+  transmute(
+    Lsq = str_extract(output, 
+                      '(?<=L-squared            = ).+(?=\\(.+\\))') %>% 
+      parse_double(),
+    Xsq = str_extract(output, 
+                      '(?<=X-squared            = ).+(?=\\(.+\\))') %>% 
+      parse_double(),
+    df = str_extract(output, '(?<=Degrees of freedom   = ).+') %>% 
+      parse_double()
+  ) %>% gt()
+
+# 条件付確率の読み出し
+
+bind_rows(
+  read_delim(max_loglik$filepath[1], delim = ' ', col_names = F) %>% 
+    select(X2, X3, X5, X6, X9) %>% 
+    slice(174:198) %>% 
+    rename(variable = X2, outcome = X3, 潜在クラス = X5, group = X6, 
+           probability = X9) %>% 
+    mutate(潜在変数 = str_extract(variable, '(?<=P\\(.|).(?=\\))'))
+  ,
+  read_delim(max_loglik$filepath[1], delim = ' ', col_names = F) %>%
+    select(X2, X3, X4, X5, X6, X9) %>% 
+    slice(169:173) %>% 
+    select(variable = X2, 潜在クラス_Y = X3, 潜在クラス_Z = X4, group = X5, 
+           probability = X9) %>% 
+    pivot_longer(cols = 潜在クラス_Y:潜在クラス_Z, 
+                 names_to = '潜在変数', names_prefix = '潜在クラス_',
+                 values_to = '潜在クラス')
+) %>% 
+  fill(variable, 潜在変数) %>% 
+  filter(!is.na(probability)) %>% 
+  mutate(probability = 
+           str_remove(probability, '\\(.+\\)') %>% parse_double()) %>% 
+  print_all()
+  
+  pivot_wider(names_from = c(潜在変数, 潜在クラス), 
+              values_from = probability, values_fill = NA) %>% 
+  gt()
+
+
