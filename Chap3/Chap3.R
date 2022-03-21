@@ -155,31 +155,4 @@ tibble(
 
 # 条件付確率の読み出し
 
-bind_rows(
-  read_delim(max_loglik$filepath[1], delim = ' ', col_names = F) %>% 
-    select(X2, X3, X5, X6, X9) %>% 
-    slice(174:198) %>% 
-    rename(variable = X2, outcome = X3, 潜在クラス = X5, group = X6, 
-           probability = X9) %>% 
-    mutate(潜在変数 = str_extract(variable, '(?<=P\\(.|).(?=\\))'))
-  ,
-  read_delim(max_loglik$filepath[1], delim = ' ', col_names = F) %>%
-    select(X2, X3, X4, X5, X6, X9) %>% 
-    slice(169:173) %>% 
-    select(variable = X2, 潜在クラス_Y = X3, 潜在クラス_Z = X4, group = X5, 
-           probability = X9) %>% 
-    pivot_longer(cols = 潜在クラス_Y:潜在クラス_Z, 
-                 names_to = '潜在変数', names_prefix = '潜在クラス_',
-                 values_to = '潜在クラス')
-) %>% 
-  fill(variable, 潜在変数) %>% 
-  filter(!is.na(probability)) %>% 
-  mutate(probability = 
-           str_remove(probability, '\\(.+\\)') %>% parse_double()) %>% 
-  print_all()
-  
-  pivot_wider(names_from = c(潜在変数, 潜在クラス), 
-              values_from = probability, values_fill = NA) %>% 
-  gt()
-
-
+# 成型がうまくいかず．．．
